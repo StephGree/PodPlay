@@ -1,5 +1,6 @@
 package com.raywenderlich.podplay.service
 
+
 import androidx.viewbinding.BuildConfig
 import com.raywenderlich.podplay.util.DateUtils
 import kotlinx.coroutines.Dispatchers
@@ -114,7 +115,6 @@ class RssFeedService private constructor() {
         }
     }
 }
-
 interface FeedService {
     @Headers(
         "Content-Type: application/xml; charset=utf-8",
