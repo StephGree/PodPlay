@@ -11,14 +11,11 @@ import com.raywenderlich.podplay.repository.PodcastRepo
 import kotlinx.coroutines.launch
 import java.util.*
 
-class PodcastViewModel(application: Application) :
-    AndroidViewModel(application) {
+class PodcastViewModel(application: Application) : AndroidViewModel(application) {
+
     var podcastRepo: PodcastRepo? = null
-    var activePodcastViewData: PodcastViewData? = null
-    private val _podcastLiveData = MutableLiveData<PodcastViewData?
-            >()
-    val podcastLiveData: LiveData<PodcastViewData?> =
-        _podcastLiveData
+    private val _podcastLiveData = MutableLiveData<PodcastViewData?>()
+    val podcastLiveData: LiveData<PodcastViewData?> = _podcastLiveData
 
     data class PodcastViewData(
         var subscribed: Boolean = false,

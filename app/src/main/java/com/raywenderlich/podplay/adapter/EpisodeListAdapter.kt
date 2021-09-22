@@ -13,16 +13,16 @@ class EpisodeListAdapter(
     private var episodeViewList:
     List<PodcastViewModel.EpisodeViewData>?
 ) : RecyclerView.Adapter<EpisodeListAdapter.ViewHolder>() {
+
     inner class ViewHolder(
         databinding: EpisodeItemBinding
     ) : RecyclerView.ViewHolder(databinding.root) {
-        var episodeViewData: PodcastViewModel.EpisodeViewData? =
-            null
+        var episodeViewData: PodcastViewModel.EpisodeViewData? = null
         val titleTextView: TextView = databinding.titleView
         val descTextView: TextView = databinding.descView
         val durationTextView: TextView = databinding.durationView
-        val releaseDateTextView: TextView =
-            databinding.releaseDateView
+        val releaseDateTextView: TextView = databinding.releaseDateView
+
     }
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
