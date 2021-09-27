@@ -1,5 +1,6 @@
 package com.raywenderlich.podplay.ui
 
+import android.content.Context
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.view.*
@@ -18,6 +19,7 @@ class PodcastDetailsFragment : Fragment() {
     private val podcastViewModel: PodcastViewModel by activityViewModels()
     private lateinit var databinding: FragmentPodcastDetailsBinding
     private lateinit var episodeListAdapter: EpisodeListAdapter
+    private var listener: OnPodcastDetailsListener? = null
 
     companion object {
         fun newInstance(): PodcastDetailsFragment {
@@ -61,6 +63,7 @@ class PodcastDetailsFragment : Fragment() {
                 // 3
                 episodeListAdapter = EpisodeListAdapter(viewData.episodes)
                 databinding.episodeRecyclerView.adapter = episodeListAdapter
+                activity?.invalidateOptionsMenu()
             }
         })
     }
@@ -69,4 +72,45 @@ class PodcastDetailsFragment : Fragment() {
         super.onCreateOptionsMenu(menu, inflater)
         inflater.inflate(R.menu.menu_details, menu)
     }
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        if (context is OnPodcastDetailsListener) {
+            listener = context
+        } else {
+            throw RuntimeException(context.toString() +
+                    " must implement OnPodcastDetailsListener")
+        }
+    }
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.menu_feed_action -> {
+                if (item.title == getString(R.string.unsubscribe)) {
+                    listener?.onUnsubscribe()
+                } else {
+                    listener?.onSubscribe()
+                }
+                true
+            }
+            else ->
+                super.onOptionsItemSelected(item)
+        }
+    }
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        podcastViewModel.podcastLiveData.observe(viewLifecycleOwner, {
+                podcast ->
+            if (podcast != null) {
+                menu.findItem(R.id.menu_feed_action).title = if
+                                                                     (podcast.subscribed)
+                    getString(R.string.unsubscribe) else
+                    getString(R.string.subscribe)
+            }
+        })
+        super.onPrepareOptionsMenu(menu)
+    }
+
+    interface OnPodcastDetailsListener {
+        fun onSubscribe()
+        fun onUnsubscribe()
+    }
 }
+
