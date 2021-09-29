@@ -102,7 +102,10 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
             }
         })
     }
-
+    private fun showError(message: String) {
+        AlertDialog.Builder(this).setMessage(message).setPositiveButton(getString(R.string.ok_button),
+            null).create().show()
+    }
     override fun onShowDetails(podcastSummaryViewData: SearchViewModel.PodcastSummaryViewData) {
         podcastSummaryViewData.feedUrl ?: return
         showProgressBar()
@@ -113,6 +116,29 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
         }
     }
 
+    private fun scheduleJobs() {
+        val constraints: Constraints = Constraints.Builder().apply {
+            setRequiredNetworkType(NetworkType.CONNECTED)
+            setRequiresCharging(true)
+        }.build()
+
+        val request = PeriodicWorkRequestBuilder<EpisodeUpdateWorker>(
+            1, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(TAG_EPISODE_UPDATE_JOB,
+            ExistingPeriodicWorkPolicy.REPLACE, request)
+    }
+
+    private fun showSubscribedPodcasts() {
+        val podcasts = podcastViewModel.getPodcasts()?.value
+
+        if (podcasts != null) {
+            databinding.toolbar.title = getString(R.string.subscribed_podcasts)
+            podcastListAdapter.setSearchData(podcasts)
+        }
+    }
 
     private fun performSearch(term: String) {
         showProgressBar()
@@ -130,18 +156,16 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
         if (Intent.ACTION_SEARCH == intent.action) {
             val query = intent.getStringExtra(SearchManager.QUERY) ?: return
             performSearch(query)
-            val podcastFeedUrl =
-                intent.getStringExtra(EpisodeUpdateWorker.EXTRA_FEED_URL)
-            if (podcastFeedUrl != null) {
-                podcastViewModel.viewModelScope.launch {
-                    val podcastSummaryViewData =
-                        podcastViewModel.setActivePodcast(podcastFeedUrl)
-                    podcastSummaryViewData?.let { podcastSummaryView ->
-                        onShowDetails(podcastSummaryView) }
-                }
+        }
+        val podcastFeedUrl = intent.getStringExtra(EpisodeUpdateWorker.EXTRA_FEED_URL)
+        if (podcastFeedUrl != null) {
+            podcastViewModel.viewModelScope.launch {
+                val podcastSummaryViewData = podcastViewModel.setActivePodcast(podcastFeedUrl)
+                podcastSummaryViewData?.let { podcastSummaryView -> onShowDetails(podcastSummaryView) }
             }
         }
     }
+
 
     private fun setupToolbar() {
         setSupportActionBar(databinding.toolbar)
@@ -152,6 +176,14 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
         searchViewModel.iTunesRepo = ItunesRepo(service)
         val rssService = RssFeedService.instance
         podcastViewModel.podcastRepo = PodcastRepo(rssService, podcastViewModel.podcastDao)
+    }
+
+    private fun setupPodcastListView() {
+        podcastViewModel.getPodcasts()?.observe(this, {
+            if (it != null) {
+                showSubscribedPodcasts()
+            }
+        })
     }
 
     private fun addBackStackListener() {
@@ -180,29 +212,30 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
     private fun showDetailsFragment() {
         val podcastDetailsFragment = createPodcastDetailsFragment()
 
-        supportFragmentManager
-            .beginTransaction()
-            .replace(R.id.podcastDetailsContainer, podcastDetailsFragment, TAG_DETAILS_FRAGMENT)
-            .addToBackStack("DetailsFragment")
-            .commit()
+        supportFragmentManager.beginTransaction().add(R.id.podcastDetailsContainer,
+            podcastDetailsFragment, TAG_DETAILS_FRAGMENT).addToBackStack("DetailsFragment").commit()
         databinding.podcastRecyclerView.visibility = View.INVISIBLE
         searchMenuItem.isVisible = false
     }
-    private fun scheduleJobs() {
-        // 1
-        val constraints: Constraints = Constraints.Builder().apply {
-            setRequiredNetworkType(NetworkType.CONNECTED)
-            setRequiresCharging(true)
-        }.build()
-        // 2
-        val request = PeriodicWorkRequestBuilder<EpisodeUpdateWorker>(
-            1, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
-        // 3
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            TAG_EPISODE_UPDATE_JOB,
-            ExistingPeriodicWorkPolicy.REPLACE, request)
+
+    private fun showPlayerFragment() {
+        val episodePlayerFragment = createEpisodePlayerFragment()
+
+        supportFragmentManager.beginTransaction().replace(R.id.podcastDetailsContainer,
+            episodePlayerFragment, TAG_PLAYER_FRAGMENT).addToBackStack("PlayerFragment").commit()
+        databinding.podcastRecyclerView.visibility = View.INVISIBLE
+        searchMenuItem.isVisible = false
+    }
+
+    private fun createEpisodePlayerFragment(): EpisodePlayerFragment {
+
+        var episodePlayerFragment = supportFragmentManager.findFragmentByTag(TAG_PLAYER_FRAGMENT) as
+                EpisodePlayerFragment?
+
+        if (episodePlayerFragment == null) {
+            episodePlayerFragment = EpisodePlayerFragment.newInstance()
+        }
+        return episodePlayerFragment
     }
 
     private fun createPodcastDetailsFragment(): PodcastDetailsFragment {
@@ -223,38 +256,24 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
         databinding.progressBar.visibility = View.INVISIBLE
     }
 
-    private fun showError(message: String) {
-        AlertDialog.Builder(this).setMessage(message).setPositiveButton(getString(R.string.ok_button),
-            null).create().show()
+    companion object {
+        private const val TAG_DETAILS_FRAGMENT = "DetailsFragment"
+        private const val TAG_EPISODE_UPDATE_JOB = "com.raywenderlich.podplay.episodes"
+        private const val TAG_PLAYER_FRAGMENT = "PlayerFragment"
     }
+
     override fun onSubscribe() {
         podcastViewModel.saveActivePodcast()
         supportFragmentManager.popBackStack()
     }
+
     override fun onUnsubscribe() {
         podcastViewModel.deleteActivePodcast()
         supportFragmentManager.popBackStack()
     }
 
-    private fun showSubscribedPodcasts() {
-        val podcasts = podcastViewModel.getPodcasts()?.value
-
-        if (podcasts != null) {
-            databinding.toolbar.title = getString(R.string.subscribed_podcasts)
-            podcastListAdapter.setSearchData(podcasts)
-        }
-    }
-    private fun setupPodcastListView() {
-        podcastViewModel.getPodcasts()?.observe(this, {
-            if (it != null) {
-                showSubscribedPodcasts()
-            }
-        })
-    }
-
-    companion object {
-        private const val TAG_DETAILS_FRAGMENT = "DetailsFragment"
-        private const val TAG_EPISODE_UPDATE_JOB = "com.raywenderlich.podplay.episodes"
-
+    override fun onShowEpisodePlayer(episodeViewData: PodcastViewModel.EpisodeViewData) {
+        podcastViewModel.activeEpisodeViewData = episodeViewData
+        showPlayerFragment()
     }
 }

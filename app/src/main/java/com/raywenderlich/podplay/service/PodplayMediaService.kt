@@ -26,8 +26,8 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.net.URL
 
-class PodplayMediaService : MediaBrowserServiceCompat(), PodplayMediaCallback.PodplayMediaListener {
-
+class PodplayMediaService : MediaBrowserServiceCompat(),
+    PodplayMediaListener {
     private lateinit var mediaSession: MediaSessionCompat
 
     override fun onStateChanged() {

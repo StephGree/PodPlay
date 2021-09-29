@@ -17,12 +17,25 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
     private val _podcastLiveData = MutableLiveData<PodcastViewData?>()
     val podcastLiveData: LiveData<PodcastViewData?> = _podcastLiveData
     var livePodcastSummaryData: LiveData<List<SearchViewModel.PodcastSummaryViewData>>? = null
+    var activeEpisodeViewData: EpisodeViewData? = null
 
     val podcastDao: PodcastDao = PodPlayDatabase
         .getInstance(application, viewModelScope)
         .podcastDao()
 
     private var activePodcast: Podcast? = null
+
+    suspend fun setActivePodcast(feedUrl: String): SearchViewModel.PodcastSummaryViewData? {
+        val repo = podcastRepo ?: return null
+        val podcast = repo.getPodcast(feedUrl)
+        return if (podcast == null) {
+            null
+        } else {
+            _podcastLiveData.value = podcastToPodcastView(podcast)
+            activePodcast = podcast
+            podcastToSummaryView(podcast)
+        }
+    }
 
     suspend fun getPodcast(podcastSummaryViewData: SearchViewModel.PodcastSummaryViewData) {
         podcastSummaryViewData.feedUrl?.let { url ->
@@ -60,7 +73,6 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
     fun saveActivePodcast() {
         val repo = podcastRepo ?: return
         activePodcast?.let {
-            it.episodes = it.episodes.drop(1)
             repo.save(it)
         }
     }
@@ -88,14 +100,8 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
 
     private fun episodesToEpisodesView(episodes: List<Episode>): List<EpisodeViewData> {
         return episodes.map {
-            EpisodeViewData(
-                it.guid,
-                it.title,
-                it.description,
-                it.mediaUrl,
-                it.releaseDate,
-                it.duration
-            )
+            val isVideo = it.mimeType.startsWith("video")
+            EpisodeViewData(it.guid, it.title, it.description, it.mediaUrl, it.releaseDate, it.duration, isVideo)
         }
     }
 
@@ -112,8 +118,7 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
         var feedUrl: String? = "",
         var feedDesc: String? = "",
         var imageUrl: String? = "",
-        var episodes: List<EpisodeViewData>
-    )
+        var episodes: List<EpisodeViewData>)
 
     data class EpisodeViewData(
         var guid: String? = "",
@@ -121,18 +126,6 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
         var description: String? = "",
         var mediaUrl: String? = "",
         var releaseDate: Date? = null,
-        var duration: String? = ""
-    )
-    suspend fun setActivePodcast(feedUrl: String):
-            SearchViewModel.PodcastSummaryViewData? {
-        val repo = podcastRepo ?: return null
-        val podcast = repo.getPodcast(feedUrl)
-        if (podcast == null) {
-            return null
-        } else {
-            _podcastLiveData.value = podcastToPodcastView(podcast)
-            activePodcast = podcast
-            return podcastToSummaryView(podcast)
-        }
-    }
+        var duration: String? = "",
+        var isVideo: Boolean = false)
 }
