@@ -20,8 +20,11 @@ interface PodcastDao {
     suspend fun loadEpisodes(podcastId: Long): List<Episode>
 
     @Query("SELECT * FROM Podcast WHERE feedUrl = :url")
-    fun loadPodcast(url: String): Podcast?
-        // 4
+  suspend fun loadPodcast(url: String): Podcast?
+
+    @Query("SELECT * FROM Podcast ORDER BY FeedTitle")
+    fun loadPodcastsStatic(): List<Podcast>
+    // 4
     @Insert(onConflict = REPLACE)
     suspend fun insertPodcast(podcast: Podcast): Long
         // 5
@@ -29,5 +32,5 @@ interface PodcastDao {
     suspend fun insertEpisode(episode: Episode): Long
 
     @Delete
-    fun deletePodcast(podcast: Podcast)
+  suspend fun deletePodcast(podcast: Podcast)
 }
