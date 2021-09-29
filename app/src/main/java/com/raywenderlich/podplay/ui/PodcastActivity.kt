@@ -14,6 +14,7 @@ import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.work.*
 import com.raywenderlich.podplay.R
 import com.raywenderlich.podplay.adapter.PodcastListAdapter
 import com.raywenderlich.podplay.adapter.PodcastListAdapter.PodcastListAdapterListener
@@ -24,10 +25,12 @@ import com.raywenderlich.podplay.service.ItunesService
 import com.raywenderlich.podplay.service.RssFeedService
 import com.raywenderlich.podplay.viewmodel.PodcastViewModel
 import com.raywenderlich.podplay.viewmodel.SearchViewModel
+import com.raywenderlich.podplay.worker.EpisodeUpdateWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
     PodcastDetailsFragment.OnPodcastDetailsListener {
@@ -49,7 +52,7 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
         createSubscription()
         handleIntent(intent)
         addBackStackListener()
-
+        scheduleJobs()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -127,6 +130,16 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
         if (Intent.ACTION_SEARCH == intent.action) {
             val query = intent.getStringExtra(SearchManager.QUERY) ?: return
             performSearch(query)
+            val podcastFeedUrl =
+                intent.getStringExtra(EpisodeUpdateWorker.EXTRA_FEED_URL)
+            if (podcastFeedUrl != null) {
+                podcastViewModel.viewModelScope.launch {
+                    val podcastSummaryViewData =
+                        podcastViewModel.setActivePodcast(podcastFeedUrl)
+                    podcastSummaryViewData?.let { podcastSummaryView ->
+                        onShowDetails(podcastSummaryView) }
+                }
+            }
         }
     }
 
@@ -174,6 +187,22 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
             .commit()
         databinding.podcastRecyclerView.visibility = View.INVISIBLE
         searchMenuItem.isVisible = false
+    }
+    private fun scheduleJobs() {
+        // 1
+        val constraints: Constraints = Constraints.Builder().apply {
+            setRequiredNetworkType(NetworkType.CONNECTED)
+            setRequiresCharging(true)
+        }.build()
+        // 2
+        val request = PeriodicWorkRequestBuilder<EpisodeUpdateWorker>(
+            1, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+        // 3
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            TAG_EPISODE_UPDATE_JOB,
+            ExistingPeriodicWorkPolicy.REPLACE, request)
     }
 
     private fun createPodcastDetailsFragment(): PodcastDetailsFragment {
@@ -225,5 +254,7 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapterListener,
 
     companion object {
         private const val TAG_DETAILS_FRAGMENT = "DetailsFragment"
+        private const val TAG_EPISODE_UPDATE_JOB = "com.raywenderlich.podplay.episodes"
+
     }
 }
